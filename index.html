@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>聊天气泡生成器｜正确气泡选择器+左右内边距调节</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui,-apple-system,sans-serif;}
+body{background:#f1f1f3;}
+
+.preview-box{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  z-index:100;
+  width:100%;
+  margin:0 auto;
+  background:#EFECE7;
+  border-radius:0 0 20px 20px;
+  overflow:hidden;
+  box-shadow:0 2px 8px #00000015;
+}
+#conv-screen{
+  width:100%;
+  height:300px;
+  padding:16px;
+  overflow-y:auto;
+  position:relative;
+}
+
+.main-container{
+  margin-top:310px;
+  padding-bottom:20px;
+}
+
+.cv-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 14px;
+  border-radius:20px;
+  margin-bottom:12px;
+}
+.cv-icon-btn{
+  width:30px;height:30px;
+  border-radius:50%;
+  border:none;
+  background:#fff;
+  border:1px solid rgba(0,0,0,0.08);
+}
+.cv-footer{
+  position:absolute;
+  bottom:16px;
+  left:16px;right:16px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:10px;
+  border-radius:30px;
+  background:rgba(239,236,231,0.85);
+  border:1px solid rgba(255,255,255,0.4);
+}
+.cv-footer input{
+  flex:1;
+  border:none;
+  padding:8px 12px;
+  border-radius:20px;
+  outline:none;
+  font-size:15px;
+}
+.cv-func-btn,.cv-btn-user,.cv-btn-ai{
+  border:none;
+  padding:6px 10px;
+  border-radius:16px;
+  font-size:12px;
+}
+.cv-msg-row{
+  margin:12px 0;
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+}
+.cv-msg-row.ai{justify-content:flex-start;}
+.cv-msg-row.user{justify-content:flex-end;}
+.avatar-wrap{position:relative;width:36px;height:36px;}
+.cv-avatar{width:100%;height:100%;border-radius:50%;background:#ccc;overflow:hidden;}
+.cv-avatar img{width:100%;height:100%;object-fit:cover;}
+.avatar-frame{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  pointer-events:none;width:42px;height:42px;background-size:100% 100%;background-repeat:no-repeat;
+}
+.bubble-wrap{position:relative;max-width:75%;}
+.cv-bubble{
+  width:100%;transition:all 0.2s ease;position:relative;z-index:1;
+  background-size:cover;background-position:center;background-repeat:no-repeat;
+  font-size:15px;
+  line-height:1.5;
+}
+.bubble-deco{
+  position:absolute;z-index:2;pointer-events:none;
+  background-size:contain;background-repeat:no-repeat;
+}
+
+.card{
+  width:94%;
+  margin:10px auto;
+  background:#fff;
+  border-radius:16px;
+  padding:16px;
+}
+.card-title{
+  font-size:16px;font-weight:600;margin-bottom:12px;color:#222;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.card-title .toggle-btn{
+  background:none;border:none;font-size:14px;color:#666;cursor:pointer;
+}
+.card-content{overflow:hidden;transition:max-height 0.3s ease;}
+.slide-row{display:flex;align-items:center;margin:10px 0;gap:10px;}
+.slide-row label{width:110px;font-size:14px;color:#444;}
+.slide-row input[type=range]{flex:1;}
+.slide-row span{width:40px;text-align:right;font-size:13px;color:#666;}
+.switch-row,.select-row,.color-row{
+  display:flex;justify-content:space-between;align-items:center;margin:9px 0;
+}
+.switch-row label,.select-row label,.color-row label{font-size:14px;color:#444;}
+select,input[type=color]{width:40px;height:30px;border-radius:6px;border:none;}
+.url-input{
+  width:100%;padding:10px 12px;border-radius:10px;border:1px solid #ddd;
+  font-size:14px;margin:6px 0;
+}
+.btn-row{display:flex;gap:10px;margin-top:8px;}
+.btn-row button{
+  flex:1;padding:10px;border:none;border-radius:10px;
+  background:#111;color:#fff;font-size:14px;
+}
+#cssCode{
+  width:100%;height:180px;border-radius:10px;border:1px solid #ddd;
+  padding:10px;font-family:monospace;font-size:12px;resize:none;
+}
+.copy-tip{text-align:center;font-size:13px;color:#27ae60;margin-top:6px;display:none;}
+.sub-card{border:1px solid #eee;border-radius:12px;padding:12px;margin:10px 0;}
+.sub-title{font-size:14px;font-weight:600;margin-bottom:10px;color:#666;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+
+.back-to-top{
+  position:fixed;bottom:20px;right:20px;width:44px;height:44px;
+  background:#27ae60;color:#fff;border:none;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 10px #00000020;cursor:pointer;z-index:99;
+}
+</style>
+</head>
+<body>
+
+<div class="preview-box">
+  <div id="conv-screen">
+    <div class="cv-header">
+      <button class="cv-icon-btn">←</button>
+      <span>聊天预览</span>
+      <button class="cv-icon-btn">⋯</button>
+    </div>
+    <div class="cv-msg-row ai">
+      <div class="avatar-wrap">
+        <div class="cv-avatar"><img src="https://picsum.photos/200/200?random=1"></div>
+        <div class="avatar-frame"></div>
+      </div>
+      <div class="bubble-wrap">
+        <div class="cv-bubble">AI气泡正确适配样式</div>
+        <div class="bubble-deco ai-deco1"></div>
+        <div class="bubble-deco ai-deco2"></div>
+      </div>
+    </div>
+    <div class="cv-msg-row user">
+      <div class="bubble-wrap">
+        <div class="cv-bubble">用户气泡正确适配样式</div>
+        <div class="bubble-deco user-deco1"></div>
+        <div class="bubble-deco user-deco2"></div>
+      </div>
+      <div class="avatar-wrap">
+        <div class="cv-avatar"><img src="https://picsum.photos/200/200?random=2"></div>
+        <div class="avatar-frame"></div>
+      </div>
+    </div>
+    <div class="cv-footer">
+      <button class="cv-func-btn">+</button>
+      <input placeholder="输入消息...">
+      <button class="cv-btn-user">↑</button>
+      <button class="cv-btn-ai">✦</button>
+    </div>
+  </div>
+</div>
+
+<div class="main-container">
+  <div class="card">
+    <div class="card-title">
+      <span>👤 头像 & 头像框</span>
+      <button class="toggle-btn" onclick="toggleCard(this)">收起</button>
+    </div>
+    <div class="card-content">
+      <div class="slide-row">
+        <label>头像大小</label>
+        <input type="range" id="avatarSize" min="20" max="80" value="36">
+        <span id="avatarSizeVal">36px</span>
+      </div>
+      <div class="switch-row">
+        <label>强制方形头像</label>
+        <input type="checkbox" id="avatarSquare">
+      </div>
+      <input class="url-input" id="frameUrl" placeholder="粘贴头像框URL">
+      <div class="slide-row">
+        <label>头像框大小</label>
+        <input type="range" id="frameSize" min="30" max="100" value="42">
+        <span id="frameSizeVal">42px</span>
+      </div>
+      <div class="btn-row">
+        <button onclick="applyFrame()">应用头像框</button>
+        <button onclick="clearFrame()">移除</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <span>🎚️ 气泡全局基础</span>
+      <button class="toggle-btn" onclick="toggleCard(this)">收起</button>
+    </div>
+    <div class="card-content">
+      <div class="slide-row">
+        <label>气泡圆角</label>
+        <input type="range" id="bRad" min="0" max="50" value="14">
+        <span id="bRadVal">14px</span>
+      </div>
+      <div class="slide-row">
+        <label>上下内边距</label>
+        <input type="range" id="bPadY" min="4" max="30" value="12">
+        <span id="bPadYVal">12px</span>
+      </div>
+      <!-- 新增：左右内边距 -->
+      <div class="slide-row">
+        <label>左右内边距</label>
+        <input type="range" id="bPadX" min="4" max="40" value="14">
+        <span id="bPadXVal">14px</span>
+      </div>
+      <div class="slide-row">
+        <label>外边距</label>
+        <input type="range" id="bMar" min="0" max="20" value="0">
+        <span id="bMarVal">0px</span>
+      </div>
+      <div class="slide-row">
+        <label>边框粗细</label>
+        <input type="range" id="bBor" min="0" max="6" value="0.5">
+        <span id="bBorVal">0.5px</span>
+      </div>
+      <div class="color-row">
+        <label>边框颜色</label>
+        <input type="color" id="cBor" value="#121212">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <span>🌫️ 气泡外阴影</span>
+      <button class="toggle-btn" onclick="toggleCard(this)">收起</button>
+    </div>
+    <div class="card-content">
+      <div class="slide-row">
+        <label>阴影模糊大小</label>
+        <input type="range" id="shadBlur" min="0" max="30" value="6">
+        <span id="shadBlurVal">6px</span>
+      </div>
+      <div class="slide-row">
+        <label>阴影扩散范围</label>
+        <input type="range" id="shadSpread" min="-10" max="10" value="0">
+        <span id="shadSpreadVal">0px</span>
+      </div>
+      <div class="slide-row">
+        <label>水平偏移</label>
+        <input type="range" id="shadX" min="-15" max="15" value="2">
+        <span id="shadXVal">2px</span>
+      </div>
+      <div class="slide-row">
+        <label>垂直偏移</label>
+        <input type="range" id="shadY" min="-15" max="15" value="2">
+        <span id="shadYVal">2px</span>
+      </div>
+      <div class="color-row">
+        <label>阴影颜色</label>
+        <input type="color" id="cShad" value="#000000">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <span>💠 气泡内阴影（inset）</span>
+      <button class="toggle-btn" onclick="toggleCard(this)">收起</button>
+    </div>
+    <div class="card-content">
+      <div class="slide-row">
+        <label>内阴影水平偏移</label>
+        <input type="range" id="insetShadX" min="-15" max="15" value="0">
+        <span id="insetShadXVal">0px</span>
+      </div>
+      <div class="slide-row">
+        <label>内阴影垂直偏移</label>
+        <input type="range" id="insetShadY" min="-15" max="15" value="2">
+        <span id="insetShadYVal">2px</span>
+      </div>
+      <div class="slide-row">
+        <label>内阴影模糊</label>
+        <input type="range" id="insetShadBlur" min="0" max="30" value="5">
+        <span id="insetShadBlurVal">5px</span>
+      </div>
+      <div class="slide-row">
+        <label>内阴影扩散</label>
+        <input type="range" id="insetShadSpread" min="-10" max="10" value="0">
+        <span id="insetShadSpreadVal">0px</span>
+      </div>
+      <div class="color-row">
+        <label>内阴影颜色</label>
+        <input type="color" id="cInsetShad" value="#000000">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <span>🤖 AI气泡 独立设置</span>
+      <button class="toggle-btn" onclick="toggleCard(this)">收起</button>
+    </div>
+    <div class="card-content">
+      <div class="select-row">
+        <label>背景模式</label>
+        <select id="aiBgMode">
+          <option value="solid">纯色</option>
+          <option value="linear">线性渐变</option>
+          <option value="radial">径向渐变</option>
+          <option value="conic">锥形渐变</option>
+          <option value="image">背景图片</option>
+        </select>
+      </div>
+      <div class="slide-row">
+        <label>背景透明度</label>
+        <input type="range" id="aiBgAlpha" min="0" max="100" value="100">
+        <span id="aiBgAlphaVal">100%</span>
+      </div>
+      <div class="two-col">
+        <div class="color-row">
+          <label>起始色</label>
+          <input type="color" id="aiColor1" value="#121212">
+        </div>
+        <div class="color-row">
+          <label>结束色</label>
+          <input type="color" id="aiColor2" value="#121212">
+        </div>
+      </div>
+      <div class="slide-row">
+        <label>渐变角度</label>
+        <input type="range" id="aiGradAngle" min="0" max="360" value="90">
+        <span id="aiGradAngleVal">90°</span>
+      </div>
+      <input class="url-input" id="aiBgImgUrl" placeholder="AI气泡背景图URL">
+      <div class="color-row">
+        <label>文字颜色</label>
+        <input type="color" id="aiTextColor" value="#ffffff">
+      </div>
+      <div class="slide-row">
+        <label>文字粗细</label>
+        <input type="range" id="aiTextWeight" min="300" max="700" step="100" value="400">
+        <span id="aiTextWeightVal">400</span>
+      </div>
+
+      <div class="sub-card">
+        <div class="sub-title">AI气泡贴图1</div>
+        <input class="url-input" id="aiDec1Url" placeholder="贴图1 URL">
+        <div class="select-row">
+          <label>锚点</label>
+          <select id="aiDec1Pos">
+            <option value="lt">左上</option>
+            <option value="lb">左下</option>
+            <option value="rt">右上</option>
+            <option value="rb">右下</option>
+          </select>
+        </div>
+        <div class="slide-row">
+          <label>大小</label>
+          <input type="range" id="aiDec1Size" min="20" max="120" value="50">
+          <span id="aiDec1SizeVal">50px</span>
+        </div>
+        <div class="slide-row">
+          <label>旋转</label>
+          <input type="range" id="aiDec1Rot" min="0" max="360" value="0">
+          <span id="aiDec1RotVal">0°</span>
+        </div>
+      </div>
+      <div class="sub-card">
+        <div class="sub-title">AI气泡贴图2</div>
+        <input class="url-input" id="aiDec2Url" placeholder="贴图2 URL">
+        <div class="select-row">
+          <label>锚点</label>
+          <select id="aiDec2Pos">
+            <option value="lt">左上</option>
+            <option value="lb">左下</option>
+            <option value="rt" selected>右上</option>
+            <option value="rb">右下</option>
+          </select>
+        </div>
+        <div class="slide-row">
+          <label>大小</label>
+          <input type="range" id="aiDec2Size" min="20" max="120" value="40">
+          <span id="aiDec2SizeVal">40px</span>
+        </div>
+        <div class="slide-row">
+          <label>旋转</label>
+          <input type="range" id="aiDec2Rot" min="0" max="360" value="0">
+          <span id="aiDec2RotVal">0°</span>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button onclick="applyAiDeco()">应用AI贴图</button>
+        <button onclick="clearAiDeco()">清空AI贴图</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <span>👤 用户气泡 独立设置</span>
+      <button class="toggle-btn" onclick="toggleCard(this)">收起</button>
+    </div>
+    <div class="card-content">
+      <div class="select-row">
+        <label>背景模式</label>
+        <select id="userBgMode">
+          <option value="solid">纯色</option>
+          <option value="linear">线性渐变</option>
+          <option value="radial">径向渐变</option>
+          <option value="conic">锥形渐变</option>
+          <option value="image">背景图片</option>
+        </select>
+      </div>
+      <div class="slide-row">
+        <label>背景透明度</label>
+        <input type="range" id="userBgAlpha" min="0" max="100" value="100">
+        <span id="userBgAlphaVal">100%</span>
+      </div>
+      <div class="two-col">
+        <div class="color-row">
+          <label>起始色</label>
+          <input type="color" id="userColor1" value="#ffffff">
+        </div>
+        <div class="color-row">
+          <label>结束色</label>
+          <input type="color" id="userColor2" value="#ffffff">
+        </div>
+      </div>
+      <div class="slide-row">
+        <label>渐变角度</label>
+        <input type="range" id="userGradAngle" min="0" max="360" value="90">
+        <span id="userGradAngleVal">90°</span>
+      </div>
+      <input class="url-input" id="userBgImgUrl" placeholder="用户气泡背景图URL">
+      <div class="color-row">
+        <label>文字颜色</label>
+        <input type="color" id="userTextColor" value="#121212">
+      </div>
+      <div class="slide-row">
+        <label>文字粗细</label>
+        <input type="range" id="userTextWeight" min="300" max="700" step="100" value="400">
+        <span id="userTextWeightVal">400</span>
+      </div>
+
+      <div class="sub-card">
+        <div class="sub-title">用户气泡贴图1</div>
+        <input class="url-input" id="userDec1Url" placeholder="贴图1 URL">
+        <div class="select-row">
+          <label>锚点</label>
+          <select id="userDec1Pos">
+            <option value="lt">左上</option>
+            <option value="lb">左下</option>
+            <option value="rt">右上</option>
+            <option value="rb">右下</option>
+          </select>
+        </div>
+        <div class="slide-row">
+          <label>大小</label>
+          <input type="range" id="userDec1Size" min="20" max="120" value="50">
+          <span id="userDec1SizeVal">50px</span>
+        </div>
+        <div class="slide-row">
+          <label>旋转</label>
+          <input type="range" id="userDec1Rot" min="0" max="360" value="0">
+          <span id="userDec1RotVal">0°</span>
+        </div>
+      </div>
+      <div class="sub-card">
+        <div class="sub-title">用户气泡贴图2</div>
+        <input class="url-input" id="userDec2Url" placeholder="贴图2 URL">
+        <div class="select-row">
+          <label>锚点</label>
+          <select id="userDec2Pos">
+            <option value="lt">左上</option>
+            <option value="lb">左下</option>
+            <option value="rt" selected>右上</option>
+            <option value="rb">右下</option>
+          </select>
+        </div>
+        <div class="slide-row">
+          <label>大小</label>
+          <input type="range" id="userDec2Size" min="20" max="120" value="40">
+          <span id="userDec2SizeVal">40px</span>
+        </div>
+        <div class="slide-row">
+          <label>旋转</label>
+          <input type="range" id="userDec2Rot" min="0" max="360" value="0">
+          <span id="userDec2RotVal">0°</span>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button onclick="applyUserDeco()">应用用户贴图</button>
+        <button onclick="clearUserDeco()">清空用户贴图</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">💻 生成CSS（实时更新）</div>
+    <textarea id="cssCode" readonly></textarea>
+    <div class="btn-row" style="margin-top:10px;">
+      <button onclick="copyCss()" style="background:#27ae60;">一键复制CSS</button>
+    </div>
+    <div class="copy-tip" id="copyTip">复制成功 ✅</div>
+  </div>
+</div>
+
+<button class="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+
+<script>
+// 采用你给的正确基础气泡选择器
+let baseCss = `/* 聊天基础样式 */
+#conv-screen { background: #EFECE7; }
+#conv-screen .cv-header { background: rgba(239,236,231,0.7); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.4); border-radius: 28px; }
+#conv-screen .cv-icon-btn { background: #fff; color: #121212; border: 1px solid rgba(18,18,18,0.05); }
+#conv-screen .cv-footer { background: rgba(239,236,231,0.85); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.4); border-radius: 36px; }
+#conv-screen .cv-func-btn { background: #fff; color: #121212; border: 1px solid rgba(18,18,18,0.05); }
+
+/* 你提供的正确基础气泡代码 */
+/* AI 气泡 */
+#conv-screen .cv-msg-row.ai .cv-bubble { background: #121212; color: #fff; border: 0.5px solid #121212; border-radius: 14px; }
+/* 用户气泡 */
+#conv-screen .cv-msg-row.user .cv-bubble { background: #fff; color: #121212; border: 0.5px solid #121212; border-radius: 14px; }`;
+
+let styleEl = null;
+const cssText = document.getElementById('cssCode');
+const copyTip = document.getElementById('copyTip');
+
+function toggleCard(btn){
+  const content = btn.closest('.card-title').nextElementSibling;
+  btn.innerText = content.style.maxHeight === '0px' ? '收起' : '展开';
+  content.style.maxHeight = content.style.maxHeight === '0px' ? '2000px' : '0px';
+}
+
+function init(){
+  bindAllSlider();
+  bindColor();
+  syncAll();
+  document.querySelectorAll('.card-content').forEach(el=>{
+    el.style.maxHeight = '2000px';
+  });
+}
+
+function bindAllSlider(){
+  const ids = [
+    'avatarSize','frameSize','bRad','bPadY','bPadX','bMar','bBor',
+    'shadBlur','shadSpread','shadX','shadY',
+    'insetShadX','insetShadY','insetShadBlur','insetShadSpread',
+    'aiDec1Size','aiDec1Rot','aiDec2Size','aiDec2Rot',
+    'userDec1Size','userDec1Rot','userDec2Size','userDec2Rot',
+    'aiBgAlpha','aiGradAngle','aiTextWeight',
+    'userBgAlpha','userGradAngle','userTextWeight'
+  ];
+  ids.forEach(id=>document.getElementById(id).oninput = syncAll);
+  ['avatarSquare','aiDec1Pos','aiDec2Pos','userDec1Pos','userDec2Pos','aiBgMode','userBgMode']
+  .forEach(id=>document.getElementById(id).onchange = syncAll);
+}
+function bindColor(){
+  ['cBor','cShad','cInsetShad',
+   'aiColor1','aiColor2','aiTextColor',
+   'userColor1','userColor2','userTextColor'
+  ].forEach(id=>{
+    document.getElementById(id).oninput = syncAll;
+  });
+}
+
+function getPosAnchor(pos){
+  let top="auto",left="auto",bottom="auto",right="auto";
+  switch(pos){
+    case "lt":top="0";left="0";break;
+    case "lb":bottom="0";left="0";break;
+    case "rt":top="0";right="0";break;
+    case "rb":bottom="0";right="0";break;
+  }
+  return {top,left,bottom,right};
+}
+
+function hexToRgba(hex,alpha){
+  let r = parseInt(hex.slice(1,3),16);
+  let g = parseInt(hex.slice(3,5),16);
+  let b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function makeBgStyle(mode, a, c1, c2, angle, imgUrl){
+  let c1rgba = hexToRgba(c1, a);
+  let c2rgba = hexToRgba(c2, a);
+  switch(mode){
+    case "solid": return c1rgba;
+    case "linear": return `linear-gradient(${angle}deg, ${c1rgba}, ${c2rgba})`;
+    case "radial": return `radial-gradient(circle, ${c1rgba}, ${c2rgba})`;
+    case "conic": return `conic-gradient(${angle}deg, ${c1rgba}, ${c2rgba})`;
+    case "image": return imgUrl ? `url(${imgUrl})` : c1rgba;
+  }
+}
+
+function syncAll(){
+  let avaSz = document.getElementById('avatarSize').value;
+  let isSquare = document.getElementById('avatarSquare').checked;
+  let avaRad = isSquare ? '4px' : '50%';
+  document.getElementById('avatarSizeVal').innerText = avaSz+'px';
+  document.querySelectorAll('.avatar-wrap').forEach(el=>{
+    el.style.width = avaSz+'px';el.style.height = avaSz+'px';
+  });
+  document.querySelectorAll('.cv-avatar').forEach(el=>{
+    el.style.width = avaSz+'px';el.style.height = avaSz+'px';el.style.borderRadius = avaRad;
+  });
+
+  let frmSz = document.getElementById('frameSize').value;
+  document.getElementById('frameSizeVal').innerText = frmSz+'px';
+  document.querySelectorAll('.avatar-frame').forEach(el=>{
+    el.style.width = frmSz+'px';el.style.height = frmSz+'px';
+  });
+
+  let bRad = document.getElementById('bRad').value;
+  let bPadY = document.getElementById('bPadY').value;
+  let bPadX = document.getElementById('bPadX').value;
+  let bMar = document.getElementById('bMar').value;
+  let bBor = document.getElementById('bBor').value;
+  let cBor = document.getElementById('cBor').value;
+
+  let shadBlur = document.getElementById('shadBlur').value;
+  let shadSpread = document.getElementById('shadSpread').value;
+  let shadX = document.getElementById('shadX').value;
+  let shadY = document.getElementById('shadY').value;
+  let cShad = document.getElementById('cShad').value;
+  let outerShadow = `${shadX}px ${shadY}px ${shadBlur}px ${shadSpread}px ${cShad}`;
+
+  let insetShadX = document.getElementById('insetShadX').value;
+  let insetShadY = document.getElementById('insetShadY').value;
+  let insetShadBlur = document.getElementById('insetShadBlur').value;
+  let insetShadSpread = document.getElementById('insetShadSpread').value;
+  let cInsetShad = document.getElementById('cInsetShad').value;
+  let insetShadow = `inset ${insetShadX}px ${insetShadY}px ${insetShadBlur}px ${insetShadSpread}px ${cInsetShad}`;
+  let boxShadowAll = `${outerShadow}, ${insetShadow}`;
+
+  let aiBgMode = document.getElementById('aiBgMode').value;
+  let aiBgAlpha = document.getElementById('aiBgAlpha').value / 100;
+  let aiGradAngle = document.getElementById('aiGradAngle').value;
+  let aiColor1 = document.getElementById('aiColor1').value;
+  let aiColor2 = document.getElementById('aiColor2').value;
+  let aiBgImgUrl = document.getElementById('aiBgImgUrl').value.trim();
+  let aiTextColor = document.getElementById('aiTextColor').value;
+  let aiTextWeight = document.getElementById('aiTextWeight').value;
+
+  let userBgMode = document.getElementById('userBgMode').value;
+  let userBgAlpha = document.getElementById('userBgAlpha').value / 100;
+  let userGradAngle = document.getElementById('userGradAngle').value;
+  let userColor1 = document.getElementById('userColor1').value;
+  let userColor2 = document.getElementById('userColor2').value;
+  let userBgImgUrl = document.getElementById('userBgImgUrl').value.trim();
+  let userTextColor = document.getElementById('userTextColor').value;
+  let userTextWeight = document.getElementById('userTextWeight').value;
+
+  document.getElementById('insetShadXVal').innerText = insetShadX+'px';
+  document.getElementById('insetShadYVal').innerText = insetShadY+'px';
+  document.getElementById('insetShadBlurVal').innerText = insetShadBlur+'px';
+  document.getElementById('insetShadSpreadVal').innerText = insetShadSpread+'px';
+  document.getElementById('aiBgAlphaVal').innerText = aiBgAlpha*100+'%';
+  document.getElementById('aiGradAngleVal').innerText = aiGradAngle+'°';
+  document.getElementById('aiTextWeightVal').innerText = aiTextWeight;
+  document.getElementById('userBgAlphaVal').innerText = userBgAlpha*100+'%';
+  document.getElementById('userGradAngleVal').innerText = userGradAngle+'°';
+  document.getElementById('userTextWeightVal').innerText = userTextWeight;
+  document.getElementById('bRadVal').innerText = bRad+'px';
+  document.getElementById('bPadYVal').innerText = bPadY+'px';
+  document.getElementById('bPadXVal').innerText = bPadX+'px';
+  document.getElementById('bMarVal').innerText = bMar+'px';
+  document.getElementById('bBorVal').innerText = bBor+'px';
+  document.getElementById('shadBlurVal').innerText = shadBlur+'px';
+  document.getElementById('shadSpreadVal').innerText = shadSpread+'px';
+  document.getElementById('shadXVal').innerText = shadX+'px';
+  document.getElementById('shadYVal').innerText = shadY+'px';
+
+  let aiBgStyle = makeBgStyle(aiBgMode, aiBgAlpha, aiColor1, aiColor2, aiGradAngle, aiBgImgUrl);
+  let userBgStyle = makeBgStyle(userBgMode, userBgAlpha, userColor1, userColor2, userGradAngle, userBgImgUrl);
+
+  // AI贴图参数
+  let aiDec1Pos = document.getElementById('aiDec1Pos').value;
+  let aiDec1Size = document.getElementById('aiDec1Size').value;
+  let aiDec1Rot = document.getElementById('aiDec1Rot').value;
+  let aiAnc1 = getPosAnchor(aiDec1Pos);
+
+  let aiDec2Pos = document.getElementById('aiDec2Pos').value;
+  let aiDec2Size = document.getElementById('aiDec2Size').value;
+  let aiDec2Rot = document.getElementById('aiDec2Rot').value;
+  let aiAnc2 = getPosAnchor(aiDec2Pos);
+
+  // 用户贴图参数
+  let userDec1Pos = document.getElementById('userDec1Pos').value;
+  let userDec1Size = document.getElementById('userDec1Size').value;
+  let userDec1Rot = document.getElementById('userDec1Rot').value;
+  let userAnc1 = getPosAnchor(userDec1Pos);
+
+  let userDec2Pos = document.getElementById('userDec2Pos').value;
+  let userDec2Size = document.getElementById('userDec2Size').value;
+  let userDec2Rot = document.getElementById('userDec2Rot').value;
+  let userAnc2 = getPosAnchor(userDec2Pos);
+
+  // 赋值显示
+  document.getElementById('aiDec1SizeVal').innerText = aiDec1Size+'px';
+  document.getElementById('aiDec1RotVal').innerText = aiDec1Rot+'°';
+  document.getElementById('aiDec2SizeVal').innerText = aiDec2Size+'px';
+  document.getElementById('aiDec2RotVal').innerText = aiDec2Rot+'°';
+  document.getElementById('userDec1SizeVal').innerText = userDec1Size+'px';
+  document.getElementById('userDec1RotVal').innerText = userDec1Rot+'°';
+  document.getElementById('userDec2SizeVal').innerText = userDec2Size+'px';
+  document.getElementById('userDec2RotVal').innerText = userDec2Rot+'°';
+
+  buildFullCss(avaSz,avaRad,frmSz,bRad,bPadY,bPadX,bMar,bBor,cBor,outerShadow,insetShadow,
+    aiBgStyle,userBgStyle,aiTextColor,aiTextWeight,userTextColor,userTextWeight,
+    aiDec1Pos,aiDec1Size,aiDec1Rot,aiDec2Pos,aiDec2Size,aiDec2Rot,
+    userDec1Pos,userDec1Size,userDec1Rot,userDec2Pos,userDec2Size,userDec2Rot);
+}
+
+function buildFullCss(avaSz,avaRad,frmSz,bRad,bPadY,bPadX,bMar,bBor,cBor,outerShadow,insetShadow,
+  aiBgStyle,userBgStyle,aiTextColor,aiTextWeight,userTextColor,userTextWeight,
+  aiDec1Pos,aiDec1Size,aiDec1Rot,aiDec2Pos,aiDec2Size,aiDec2Rot,
+  userDec1Pos,userDec1Size,userDec1Rot,userDec2Pos,userDec2Size,userDec2Rot){
+
+  let aiAnc1 = getPosAnchor(aiDec1Pos);
+  let aiAnc2 = getPosAnchor(aiDec2Pos);
+  let userAnc1 = getPosAnchor(userDec1Pos);
+  let userAnc2 = getPosAnchor(userDec2Pos);
+
+  let extendCss = `
+#conv-screen .avatar-wrap { width: ${avaSz}px; height: ${avaSz}px; position: relative; }
+#conv-screen .cv-avatar { width: ${avaSz}px; height: ${avaSz}px; border-radius: ${avaRad}; overflow: hidden; }
+#conv-screen .avatar-frame { position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;width: ${frmSz}px;height: ${frmSz}px;background-size:100% 100%;background-repeat:no-repeat; }
+
+#conv-screen .bubble-wrap { position: relative; max-width: 75%; }
+#conv-screen .bubble-deco { position:absolute;z-index:2;pointer-events:none;background-size:contain;background-repeat:no-repeat; }
+
+/* ========== 覆写AI气泡 独立样式 ========== */
+#conv-screen .cv-msg-row.ai .cv-bubble {
+  border-radius: ${bRad}px;
+  padding: ${bPadY}px ${bPadX}px;
+  margin: ${bMar}px 0;
+  border: ${bBor}px solid ${cBor};
+  box-shadow: ${outerShadow}, ${insetShadow};
+  background: ${aiBgStyle} !important;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  z-index: 1;
+  color: ${aiTextColor} !important;
+  font-weight: ${aiTextWeight};
+}
+/* AI贴图1 */
+#conv-screen .cv-msg-row.ai .ai-deco1 { 
+  top:${aiAnc1.top};left:${aiAnc1.left};bottom:${aiAnc1.bottom};right:${aiAnc1.right};
+  width:${aiDec1Size}px;height:${aiDec1Size}px;transform:rotate(${aiDec1Rot}deg);
+}
+/* AI贴图2 */
+#conv-screen .cv-msg-row.ai .ai-deco2 { 
+  top:${aiAnc2.top};left:${aiAnc2.left};bottom:${aiAnc2.bottom};right:${aiAnc2.right};
+  width:${aiDec2Size}px;height:${aiDec2Size}px;transform:rotate(${aiDec2Rot}deg);
+}
+
+/* ========== 覆写用户气泡 独立样式 ========== */
+#conv-screen .cv-msg-row.user .cv-bubble {
+  border-radius: ${bRad}px;
+  padding: ${bPadY}px ${bPadX}px;
+  margin: ${bMar}px 0;
+  border: ${bBor}px solid ${cBor};
+  box-shadow: ${outerShadow}, ${insetShadow};
+  background: ${userBgStyle} !important;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  z-index: 1;
+  color: ${userTextColor} !important;
+  font-weight: ${userTextWeight};
+}
+/* 用户贴图1 */
+#conv-screen .cv-msg-row.user .user-deco1 { 
+  top:${userAnc1.top};left:${userAnc1.left};bottom:${userAnc1.bottom};right:${userAnc1.right};
+  width:${userDec1Size}px;height:${userDec1Size}px;transform:rotate(${userDec1Rot}deg);
+}
+/* 用户贴图2 */
+#conv-screen .cv-msg-row.user .user-deco2 { 
+  top:${userAnc2.top};left:${userAnc2.left};bottom:${userAnc2.bottom};right:${userAnc2.right};
+  width:${userDec2Size}px;height:${userDec2Size}px;transform:rotate(${userDec2Rot}deg);
+}`;
+
+  cssText.value = baseCss + extendCss;
+  applyCss(cssText.value);
+}
+
+function applyCss(css){
+  if(styleEl) styleEl.remove();
+  styleEl = document.createElement('style');
+  styleEl.textContent = css;
+  document.head.appendChild(styleEl);
+}
+
+function copyCss(){
+  cssText.select();
+  document.execCommand('copy');
+  copyTip.style.display='block';
+  setTimeout(()=>copyTip.style.display='none',1500);
+}
+
+// 头像框
+function applyFrame(){
+  let url = document.getElementById('frameUrl').value.trim();
+  if(!url)return alert('请先粘贴头像框URL');
+  document.querySelectorAll('.avatar-frame').forEach(el=>el.style.backgroundImage=`url(${url})`);
+  syncAll();
+}
+function clearFrame(){
+  document.querySelectorAll('.avatar-frame').forEach(el=>el.style.backgroundImage='');
+  document.getElementById('frameUrl').value='';syncAll();
+}
+
+// AI贴图
+function applyAiDeco(){
+  let u1=document.getElementById('aiDec1Url').value.trim();
+  let u2=document.getElementById('aiDec2Url').value.trim();
+  if(!u1&&!u2)return alert('请至少填写一个AI贴图URL');
+  if(u1) document.querySelectorAll('.ai-deco1').forEach(el=>el.style.backgroundImage=`url(${u1})`);
+  if(u2) document.querySelectorAll('.ai-deco2').forEach(el=>el.style.backgroundImage=`url(${u2})`);
+  syncAll();
+}
+function clearAiDeco(){
+  document.querySelectorAll('.ai-deco1,.ai-deco2').forEach(el=>el.style.backgroundImage='');
+  document.getElementById('aiDec1Url').value='';
+  document.getElementById('aiDec2Url').value='';
+  syncAll();
+}
+
+// 用户贴图
+function applyUserDeco(){
+  let u1=document.getElementById('userDec1Url').value.trim();
+  let u2=document.getElementById('userDec2Url').value.trim();
+  if(!u1&&!u2)return alert('请至少填写一个用户贴图URL');
+  if(u1) document.querySelectorAll('.user-deco1').forEach(el=>el.style.backgroundImage=`url(${u1})`);
+  if(u2) document.querySelectorAll('.user-deco2').forEach(el=>el.style.backgroundImage=`url(${u2})`);
+  syncAll();
+}
+function clearUserDeco(){
+  document.querySelectorAll('.user-deco1,.user-deco2').forEach(el=>el.style.backgroundImage='');
+  document.getElementById('userDec1Url').value='';
+  document.getElementById('userDec2Url').value='';
+  syncAll();
+}
+
+init();
+</script>
+</body>
+</html>
